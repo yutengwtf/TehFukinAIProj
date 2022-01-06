@@ -3,6 +3,12 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import copy
+import numpy as np
+
+def phi(t):
+    t = torch.as_tensor(np.asarray(t)).float()
+    t = t.unsqueeze(dim=0) if t.ndim == 3 else t
+    return t.cuda()
 
 class Brain(nn.Module):
     def __init__(self, env):
@@ -18,7 +24,7 @@ class Brain(nn.Module):
             nn.Linear(in_features=64*7*7, out_features=512),
             nn.ReLU(), 
             nn.Linear(in_features=512, out_features=env.action_space.n)
-        ).double()
+        )
         self.target = copy.deepcopy(self.policy)
         for p in self.target.parameters():
             p.requires_grad = False
@@ -30,9 +36,10 @@ class Brain(nn.Module):
         ''' No gradient, return action(int) '''
         return torch.argmax(self.policy(obs)).item()
 
-    def get_Q(self, obses):
+    def get_Q(self, states_t, actions_t):
         ''' With gradient, return Qs(tensor) '''
-        return self.policy(obses)
+        Qs_t = torch.gather(self.policy(states_t), 1, actions_t.view(-1, 1)).view(-1)
+        return Qs_t
 
     def get_td(self, obses):
         ''' Without gradient, return Qs_t(tensor)'''
@@ -43,6 +50,12 @@ class Brain(nn.Module):
 
     def update(self):
         self.target.load_state_dict(self.policy.state_dict())
+
+    def save_learnable(self, path):
+        torch.save(self.policy.state_dict(), path)
+
+    def import_learnable(self, path):
+        self.policy.load_state_dict(torch.load(path))
 
 class TargetNetworkBrain(Brain):
     def __init__(self, env):
@@ -77,25 +90,25 @@ class DuelingNetworkBrain(nn.Module):
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.Flatten()
-        ).double()
+        )
 
         self.val_ly = nn.Sequential(
             nn.Linear(in_features=64*7*7, out_features=512),
             nn.ReLU(),
             nn.Linear(in_features=512, out_features=1)
-        ).double()
+        )
 
         self.adv_ly = nn.Sequential(
             nn.Linear(in_features=64*7*7, out_features=512),
             nn.ReLU(),
             nn.Linear(in_features=512, out_features=env.action_space.n)
-        ).double()
+        )
 
     def forward(self, t):
         charateristic = self.conv_ly(t)
         advantage = self.adv_ly(charateristic)
         value = self.val_ly(charateristic)
-        return advantage + value
+        return value + advantage + torch.mean(advantage, dim=1).view(-1, 1)
 
     def learnable(self):
         return self.parameters()
@@ -104,12 +117,19 @@ class DuelingNetworkBrain(nn.Module):
         ''' No gradient, return action(int) '''
         return torch.argmax(self(obs)).item()
 
-    def get_Q(self, obses):
+    def get_Q(self, states_t, actions_t):
         ''' With gradient, return Qs(tensor) '''
-        return self(obses)
+        Qs_t = torch.gather(self(states_t), 1, actions_t.view(-1, 1)).view(-1)
+        return Qs_t
 
     def get_td(self, obses):
         ''' Without gradient, return Qs_t(tensor)'''
         with torch.no_grad():
             y = self(obses)
             return torch.max(y, dim=1)[0]
+
+    def save_learnable(self, path):
+        torch.save(self.state_dict(), path)
+
+    def import_learnable(self, path):
+        self.load_state_dict(torch.load(path))

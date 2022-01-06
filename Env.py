@@ -180,7 +180,7 @@ def create_env(id):
                                 f'ALE/{id}-v5', 
                                 frameskip=1, 
                                 repeat_action_probability=0,
-                                full_action_space=True,
+                                full_action_space=False,
                                 render_mode=None
                             )
                         ), 
