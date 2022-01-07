@@ -56,6 +56,7 @@ class Brain(nn.Module):
 
     def import_learnable(self, path):
         self.policy.load_state_dict(torch.load(path))
+        self.update()
 
 class TargetNetworkBrain(Brain):
     def __init__(self, env):
