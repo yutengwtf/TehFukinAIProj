@@ -10,6 +10,11 @@ def phi(t):
     t = t.unsqueeze(dim=0) if t.ndim == 3 else t
     return t.cuda()
 
+def phi_v2(t):
+    t = torch.as_tensor(t)
+    t = t.unsqueeze(dim=0) if t.ndim == 3 else t
+    return t.cuda()
+
 class Brain(nn.Module):
     def __init__(self, env):
         super().__init__()
@@ -34,7 +39,8 @@ class Brain(nn.Module):
 
     def get_action(self, obs):
         ''' No gradient, return action(int) '''
-        return torch.argmax(self.policy(obs)).item()
+        with torch.no_grad():
+            return torch.argmax(self.policy(obs)).item()    
 
     def get_Q(self, states_t, actions_t):
         ''' With gradient, return Qs(tensor) '''
@@ -109,14 +115,15 @@ class DuelingNetworkBrain(nn.Module):
         charateristic = self.conv_ly(t)
         advantage = self.adv_ly(charateristic)
         value = self.val_ly(charateristic)
-        return value + advantage + torch.mean(advantage, dim=1).view(-1, 1)
+        return value + advantage - torch.mean(advantage, dim=1).view(-1, 1)
 
     def learnable(self):
         return self.parameters()
 
     def get_action(self, obs):
         ''' No gradient, return action(int) '''
-        return torch.argmax(self(obs)).item()
+        with torch.no_grad():
+            return torch.argmax(self(obs)).item()
 
     def get_Q(self, states_t, actions_t):
         ''' With gradient, return Qs(tensor) '''
@@ -148,7 +155,8 @@ class DoubleDuelingBrain(nn.Module):
 
     def get_action(self, obs):
         ''' No gradient, return action(int) '''
-        return torch.argmax(self.policy(obs)).item()
+        with torch.no_grad():
+            return torch.argmax(self.policy(obs)).item()
 
     def get_Q(self, states_t, actions_t):
         ''' With gradient, return Qs(tensor) '''
@@ -164,7 +172,7 @@ class DoubleDuelingBrain(nn.Module):
             return Qs_t
 
     def learnable(self):
-        return self.policy.parameters()
+        return self.policy.learnable()
 
     def update(self):
         self.target.load_state_dict(self.policy.state_dict())
