@@ -134,3 +134,44 @@ class DuelingNetworkBrain(nn.Module):
 
     def import_learnable(self, path):
         self.load_state_dict(torch.load(path))
+
+class DoubleDuelingBrain(nn.Module):
+    def __init__(self, env):
+        super().__init__()
+        self.policy = DuelingNetworkBrain(env)
+        self.target = copy.deepcopy(self.policy)
+        for p in self.target.parameters():
+            p.requires_grad = False
+        
+    def forward(self, t):
+        return self.policy(t)
+
+    def get_action(self, obs):
+        ''' No gradient, return action(int) '''
+        return torch.argmax(self.policy(obs)).item()
+
+    def get_Q(self, states_t, actions_t):
+        ''' With gradient, return Qs(tensor) '''
+        Qs_t = torch.gather(self.policy(states_t), 1, actions_t.view(-1, 1)).view(-1)
+        return Qs_t
+
+    def get_td(self, obses):
+        ''' Without gradient, return Qs_t(tensor)'''
+        with torch.no_grad():
+            actions_t = torch.argmax(self.policy(obses), dim=1)
+            y_Q = self.target(obses)
+            Qs_t = torch.gather(y_Q, 1, actions_t.view(-1, 1)).view(-1)
+            return Qs_t
+
+    def learnable(self):
+        return self.policy.parameters()
+
+    def update(self):
+        self.target.load_state_dict(self.policy.state_dict())
+
+    def save_learnable(self, path):
+        torch.save(self.policy.state_dict(), path)
+
+    def import_learnable(self, path):
+        self.policy.load_state_dict(torch.load(path))
+        self.update()
