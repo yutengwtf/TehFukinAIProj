@@ -49,20 +49,20 @@ class FeatValAnal(nn.Module):
         return self.net(t)
 
 class Dueling(nn.Module):
-    def __init__(self, action_num):
+    def __init__(self):
         super().__init__()
         self.val_ly = FeatValAnal()
-        self.adv_ly = FeatAnal(action_num)
+        self.adv_ly = FeatAnal()
     def forward(self, charateristic):
         advantage = self.adv_ly(charateristic)  
         value = self.val_ly(charateristic)
         return value + advantage - torch.mean(advantage, dim=1).view(-1, 1)  
 
 class CNNNetwork(nn.Module):
-    def __init__(self, action_num):
+    def __init__(self):
         super().__init__()
         self.conv = ImageAnal()
-        self.linear = FeatAnal(action_num)
+        self.linear = FeatAnal()
 
     def forward(self, t):
         return self.linear(self.conv(t))
@@ -77,10 +77,10 @@ class CNNNetwork(nn.Module):
         return self.linear.parameters()
 
 class DuelingNetwork(nn.Module):
-    def __init__(self, action_num):
+    def __init__(self):
         super().__init__()
         self.conv = ImageAnal()
-        self.linear = Dueling(action_num)
+        self.linear = Dueling()
 
     def forward(self, t):
         return self.linear(self.conv(t))
